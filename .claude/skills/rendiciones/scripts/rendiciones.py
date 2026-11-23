@@ -5,6 +5,11 @@ Subcomandos:
   existentes  Vuelca a JSON todas las filas ya registradas en la planilla.
   conciliar   Cruza movimientos bancarios (JSON) contra la planilla y separa
               los ya rendidos de los pendientes.
+  vincular    Une documentos escaneados (docs.json) con movimientos bancarios
+              (pendientes.json) por monto y fecha, y arma filas candidatas.
+  escribir    Envía las filas aprobadas al puente Apps Script, que las agrega
+              directo en la hoja del mes de la planilla original en Drive.
+              Requiere RENDICIONES_WEBAPP_URL y RENDICIONES_TOKEN en el entorno.
   generar     Escribe las filas aprobadas en un .xlsx con el formato exacto de
               la hoja mensual (columnas, listas desplegables y formatos).
               Con --planilla, además genera una copia completa de la planilla
@@ -16,6 +21,7 @@ Uso típico:
       [--planilla planilla.xlsx --out-planilla planilla_actualizada.xlsx]
 """
 import argparse
+import collections
 import datetime as dt
 import json
 import re
@@ -263,6 +269,88 @@ def cmd_generar(a):
         print(f"Planilla actualizada: {destino} (filas {ultima + 1}-{ultima + len(filas)} de '{nombre_hoja}')")
 
 
+METODO = {"compra_debito": "Debito", "compra_credito": "Credito", "transferencia_enviada": "Transferencia",
+          "transferencia_programada": "Transferencia", "pago_servicio": "Servipag", "cargo_automatico": "Debito"}
+INSTITUCION = {"bci": "BCI", "santander": "Santander", "mercado pago": "Mercado Pago", "scotiabank": "SCOTIABANK"}
+
+
+def cmd_vincular(a):
+    docs = json.load(open(a.docs, encoding="utf-8"))
+    pend = json.load(open(a.movs, encoding="utf-8"))
+    movs = pend["pendientes"] if isinstance(pend, dict) else pend
+    usados, filas = set(), []
+    for d in docs:
+        fd, td = a_fecha(d.get("fecha")), a_monto(d.get("total"))
+        mejor = None
+        for i, m in enumerate(movs):
+            if i in usados or a_monto(m.get("monto")) != td:
+                continue
+            fm = a_fecha(m.get("fecha"))
+            dias = abs((fm - fd).days) if fm and fd else 99
+            if dias <= a.tolerancia and (mejor is None or dias < mejor[1]):
+                mejor = (i, dias)
+        m = movs[mejor[0]] if mejor else None
+        if mejor:
+            usados.add(mejor[0])
+        fila = {
+            "rut": d.get("rut_emisor"), "razon_social": d.get("razon_social"),
+            "fecha": (m or d).get("fecha"), "tipo_documento": d.get("tipo_documento"),
+            "n_documento": d.get("folio"), "neto": d.get("neto"), "iva": d.get("iva"),
+            "monto": td, "estado": "Rendido",
+            "observaciones": d.get("detalle") or "",
+            "metodo_pago": METODO.get((m or {}).get("tipo")) or
+                           {"efectivo": "Efectivo", "débito": "Debito", "crédito": "Credito",
+                            "transferencia": "Transferencia"}.get(d.get("medio_pago_visible") or ""),
+            "institucion": INSTITUCION.get(norm((m or {}).get("banco"))) if m else
+                           ("Caja" if d.get("medio_pago_visible") == "efectivo" else None),
+            "local": None, "area": None,
+            "fuente": f'{d.get("fuente")} + {m.get("message_id") if m else "sin movimiento bancario"}',
+            "respaldo_url": d.get("respaldo_url"), "nota_waldemar": d.get("nota_waldemar"),
+            "confianza": d.get("confianza"), "nota": d.get("dudas"),
+            "vinculo": "doc+banco" if m else "solo_documento",
+        }
+        filas.append(fila)
+    for i, m in enumerate(movs):
+        if i not in usados:
+            filas.append({"razon_social": m.get("contraparte"), "fecha": m.get("fecha"),
+                          "monto": a_monto(m.get("monto")), "tipo_documento": "Otro",
+                          "metodo_pago": METODO.get(m.get("tipo")),
+                          "institucion": INSTITUCION.get(norm(m.get("banco"))),
+                          "observaciones": m.get("mensaje") or "", "cuenta": m.get("cuenta"),
+                          "fuente": m.get("message_id"), "vinculo": "solo_banco"})
+    txt = json.dumps(filas, ensure_ascii=False, indent=1, default=str)
+    open(a.out, "w", encoding="utf-8").write(txt) if a.out else print(txt)
+    n = collections.Counter(f["vinculo"] for f in filas)
+    print(f"doc+banco={n['doc+banco']} solo_documento={n['solo_documento']} solo_banco={n['solo_banco']}", file=sys.stderr)
+
+
+def cmd_escribir(a):
+    import os
+    import urllib.request
+    url, token = os.environ.get("RENDICIONES_WEBAPP_URL"), os.environ.get("RENDICIONES_TOKEN")
+    if not url or not token:
+        sys.exit("Faltan RENDICIONES_WEBAPP_URL / RENDICIONES_TOKEN en el entorno (ver apps-script/README.md).")
+    filas = json.load(open(a.filas, encoding="utf-8"))
+    errores = validar(filas)
+    if errores:
+        sys.exit("ERRORES DE VALIDACIÓN:\n" + "\n".join(errores))
+    claves = [k for _, k in COLUMNAS if k != "n"] + ["centro_costo"]
+    limpias = []
+    for f in filas:
+        g = {k: f.get(k) for k in claves if f.get(k) not in (None, "")}
+        g["fecha"] = a_fecha(f["fecha"]).strftime("%d/%m/%Y")
+        if f.get("fecha_venc"):
+            g["fecha_venc"] = a_fecha(f["fecha_venc"]).strftime("%d/%m/%Y")
+        limpias.append(g)
+    body = json.dumps({"token": token, "mes": a.mes, "filas": limpias, "simular": a.simular}).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        resp = json.loads(r.read().decode())
+    print(json.dumps(resp, ensure_ascii=False, indent=1))
+    if not resp.get("ok"):
+        sys.exit(1)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -281,8 +369,18 @@ def main():
     g.add_argument("--out", required=True)
     g.add_argument("--planilla")
     g.add_argument("--out-planilla")
+    v = sp.add_parser("vincular")
+    v.add_argument("--docs", required=True)
+    v.add_argument("--movs", required=True, help="pendientes.json de conciliar (o lista de movimientos)")
+    v.add_argument("--out")
+    v.add_argument("--tolerancia", type=int, default=5)
+    w = sp.add_parser("escribir")
+    w.add_argument("--filas", required=True)
+    w.add_argument("--mes", type=int, required=True)
+    w.add_argument("--simular", action="store_true", help="valida y muestra dónde quedarían, sin escribir")
     a = p.parse_args()
-    {"existentes": cmd_existentes, "conciliar": cmd_conciliar, "generar": cmd_generar}[a.cmd](a)
+    {"existentes": cmd_existentes, "conciliar": cmd_conciliar, "generar": cmd_generar,
+     "vincular": cmd_vincular, "escribir": cmd_escribir}[a.cmd](a)
 
 
 if __name__ == "__main__":

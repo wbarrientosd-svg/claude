@@ -33,6 +33,11 @@ Escribir los valores **exactamente** así (mayúsculas incluidas). El historial 
 
 ## Qué NO es gasto de la empresa (no rendir, o dejar "Pendiente" para consultar)
 
+- **Movimientos de las cuentas personales de Waldemar** (avisos dirigidos solo a wbarrientosd@gmail.com):
+  confirmado por Waldemar que son casi todos personales. Solo se rinden si él manda el respaldo con asunto
+  "rendicion" o lo indica expresamente. Las cuentas de empresa notifican a catandistribuidora@gmail.com.
+  Ejemplos de nov-2026 confirmados personales: Karin Gutiérrez, Vanessa Reyes, Jaime Carbonell, Maritza Púa,
+  Norma Domínguez, Uber, Copec, botillería, barbería.
 - Transferencias **recibidas** (abonos) y traspasos entre cuentas propias de Waldemar.
 - Gastos familiares/personales evidentes: colegio (Liceo Mater Purissima, "polera mater",
   Syscol), supermercado del hogar, salud personal, compras personales en MercadoLibre.
