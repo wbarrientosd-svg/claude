@@ -26,6 +26,10 @@ Los pagos grandes de empresa (arriendos, imposiciones, honorarios, Servipag, SII
 normalmente **no generan aviso** y solo aparecen en las cartolas. Si en el mes no aparecen los gastos
 recurrentes (arriendos de los 4 locales, imposiciones, contabilidad), decirlo y pedir la cartola
 (PDF o Excel) de Santander / BCI empresa / Mercado Pago / Scotiabank. No inventar movimientos.
+Lo más eficiente: que Waldemar descargue desde BCI Pyme / Mercado Pago / Santander las cartolas del mes en Excel y las
+deje en Drive (o las adjunte); se leen con `download_file_content`. En una sesión del escritorio con Claude in Chrome se
+pueden descargar desde la web del banco, **solo lectura**: nunca hacer transferencias, pagos ni cambios de datos, y el
+login/2FA (Bci Pass, clave dinámica) lo hace Waldemar.
 
 ## Flujo
 
@@ -53,12 +57,14 @@ recurrentes (arriendos de los 4 locales, imposiciones, contabilidad), decirlo y 
    estado, observaciones, metodo_pago, institucion, local, area`; opcionales: `rut, n_documento, neto, iva, fuente, confianza, nota`) y correr:
    `python3 scripts/rendiciones.py generar --filas filas.json --mes N --out Rendiciones_<Mes>_<Año>.xlsx --planilla planilla.xlsx --out-planilla "Rendiciones Waldemar 2026 (actualizada).xlsx"`
    El script valida que los valores calcen con las listas desplegables de la planilla y aborta si no.
-8. **Entregar.** La planilla original es del contador y Waldemar solo tiene permiso de lectura, y el conector de Drive
-   no puede sobrescribir el contenido de un .xlsx existente. Por eso:
-   - Subir `Rendiciones_<Mes>_<Año>.xlsx` a Drive de Waldemar con `mcp__Google_Drive__create_file`
+8. **Entregar.** Waldemar tiene permiso de edición (writer) sobre la planilla, pero el conector de Drive solo crea archivos
+   nuevos o cambia metadatos: no puede sobrescribir el contenido de un .xlsx existente. Por eso:
+   - Subir la copia completa actualizada a Drive y pedirle a Waldemar que la cargue sobre el original con
+     Drive → clic derecho en la planilla → "Administrar versiones" → "Subir nueva versión" (conserva link e ID).
+     Si la sesión tiene navegador (Claude in Chrome en el equipo de Waldemar), puede hacerse ahí directamente.
+   - Además, subir `Rendiciones_<Mes>_<Año>.xlsx` (solo las filas nuevas) a Drive de Waldemar con `mcp__Google_Drive__create_file`
      (`disableConversionToGoogleType: true`) y darle el link.
    - Ofrecer enviar la propuesta a Luis (contador) por correo **solo si Waldemar lo pide** (borrador con `create_draft`).
-   - La copia completa actualizada queda disponible si Luis prefiere reemplazar el archivo.
 9. **Resumen final:** total rendido del mes, n° de filas nuevas, pendientes de respaldo (facturas/boletas faltantes)
    y movimientos personales excluidos.
 
