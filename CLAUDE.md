@@ -52,3 +52,7 @@ Secuencia a ejecutar cada mañana, en este orden:
 - Fireflies (transcripciones de reuniones)
 - Shopify (Distribuidora Catán)
 - Google Drive
+
+## Rendiciones de gastos
+- Planilla: "Rendiciones Waldemar 2026.xlsx" en Drive (ID `1nqor7iWPW-dURMRFdm873kAQRTxjgNCf`, dueño: contador Luis Riquelme; Waldemar tiene solo lectura).
+- Skill `rendiciones` (`.claude/skills/rendiciones/`): concilia avisos/cartolas bancarias contra la planilla, clasifica según `reglas.md` y genera las filas del mes. Siempre confirmar con Waldemar antes de generar filas.
