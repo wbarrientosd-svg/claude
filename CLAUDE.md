@@ -52,3 +52,9 @@ Secuencia a ejecutar cada mañana, en este orden:
 - Fireflies (transcripciones de reuniones)
 - Shopify (Distribuidora Catán)
 - Google Drive
+
+## Agencia Aurora (marketing y contenido autónomo)
+- Proyecto en `agencia/` (plan de negocio, operación, clientes, briefs, entregables y reportes).
+- Se activa con `/agencia <encargo>` o `claude --agent aurora`.
+- Equipo de subagentes en `.claude/agents/`: Atlas (estrategia), Pluma (copy), Prisma (diseño), Lumen (video), Eco (redes), Raíz (SEO), Chispa (ads), Sextante (analítica), Puente (ventas) y Ancla (calidad).
+- Regla: nada se publica, se envía o implica gasto sin aprobación de Waldemar.
